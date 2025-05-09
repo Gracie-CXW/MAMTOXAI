@@ -1,4 +1,4 @@
-# Placeholder file for utils.py
+# In Progress
 # As of MAY-09-2025: Written some core tools for the AI to utilize. Still yet to implement chat memeory or tools to decode files other than pdfs. Currently, only one question can be asked, and no cache is available. 
 
 # This file contains possible tools for the model to utilize
