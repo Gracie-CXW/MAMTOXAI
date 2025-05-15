@@ -1,6 +1,6 @@
 # In Progress
 # As of MAY-09-2025: Written some core tools for the AI to utilize. Still yet to implement chat memeory or tools to decode files other than pdfs. Currently, only one question can be asked, and no cache is available. 
-
+# As of MAY-15-2025: Written tool for query breakdown, created pull request for using langchain built-in chroma module instead of chromadb itself in fear of compatibility issues.
 # This file contains possible tools for the model to utilize
 
 def empty_cache(fp):
@@ -98,4 +98,10 @@ def breakdown_input(question,llm):
     return response.strip(\n) # not sure if correct syntax, should check later.
 
 def RAG(question,vector_dir):
+    question = question
+    vector_dir = vector_dir
     
+
+    class RAG_State(TypedDict):
+        question: str
+        context: 
