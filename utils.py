@@ -25,10 +25,6 @@ def search_and_parse(pdf,keywords,vector_dir):
                 this_page = page.get_text()
                 relevant_pages.append(this_page)
 
-    # Initializing vector client
-    client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet",persist_directory=vector_dir))
-    collection = client.get_or_create_collection(name="MAMTOX_Collections") 
-
     model = Sentence_Transformer('all-MiniLM-L6-v2') 
     current_title = None 
     current_txt = ""
@@ -49,36 +45,28 @@ def search_and_parse(pdf,keywords,vector_dir):
 
     embeddings = model.encode(texts).to_list()
 
-    collection.add(
-        documents = texts,
-        metadata = metadata,
-        ids = ids,
-        embeddings = embeddings
+    vector_store = Chroma(
+        collection_name = "toxicology_all",
+        embedding_function = embeddings,
+        persist_directory=vector_dir
     )
-
-    client.persist()
 
 def just_parse(pdf,vector_dir):
     import pymupdf 
     import Sentence_Transformer
-    import chromadb 
-    from chromadb.configs import settings 
+    from langchain_chroma import Chroma
 
     doc = pymupdf.open(pdf)
     pages = [page.get_text() for page in doc]
 
-    client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet",persist_directory=vector_dir))
-    collection = client.get_or_create_collection(name="MAMTOX_Collections")
-
     model = Sentence_Transformer('all-MiniLM-L6-v2') 
     embeddings = model.encode(texts).to_list()
 
-    collection.add(
-        documents = texts,
-        embeddings = embeddings
+    vector_store = Chroma(
+        collection_name = "toxicology_all",
+        embedding_function = embeddings,
+        persist_directory=vector_dir
     )
-
-    client.persist()
 
 def breakdown_input(question,llm):
     from langchain import PromptTemplate
@@ -97,5 +85,14 @@ def breakdown_input(question,llm):
 
     return response.strip(\n) # not sure if correct syntax, should check later.
 
-def RAG(question,vector_dir):
+def RAG_search_and_respond(question,vector_dir,llm):
+    question = question
+    vector_dir = vector_dir
+
+    import langchain
+    from langchain_chroma import Chroma
+
+    
+
+    
     
