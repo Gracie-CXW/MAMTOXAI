@@ -8,6 +8,19 @@ def empty_cache(fp):
         shutil.rmtree(fp)
         os.makedirs(fp)
 
+def store_pdf_id(pdf,dict):
+    # This code looks trash, need to review later. Oringinally wanted to use for generating names for chromadb collections to avoid conflict, not sure how to implement.
+    import numpy as np
+
+    # generate and test id
+    id = np.random.rand(1,1).tolist()[0][0]
+    while dict[id]:
+        id = np.random.rand(1,1).tolist()[0][0]
+    
+    # store
+    dict.update({id:pdf})
+
+
 def search_and_parse(pdf,keywords,vector_dir):
     import pymupdf
     import chromadb 
