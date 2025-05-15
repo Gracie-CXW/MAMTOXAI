@@ -80,3 +80,22 @@ def just_parse(pdf,vector_dir):
 
     client.persist()
 
+def breakdown_input(question,llm):
+    from langchain import PromptTemplate
+    llm=llm
+    question=question
+    template = """
+    You are a toxicology evaluator at Health Canada. You are being asked a question on a toxicology report submission for a
+    particular substance or chemical. Break down the question in terms that an LLM model can easily 
+    understand and therefore answer. The question is as follows: {question}
+    """
+    prompt = PromptTemplate(
+        input_variables=["query"],
+        template=template
+    )
+    response = llm(prompt.format(query=question)
+
+    return response.strip(\n) # not sure if correct syntax, should check later.
+
+def RAG(question,vector_dir):
+    
