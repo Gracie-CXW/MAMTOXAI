@@ -60,25 +60,25 @@ def search_and_parse(pdf,keywords,vector_dir):
 
 def just_parse(pdf,vector_dir):
     import pymupdf 
-    import Sentence_Transformer
+    from sentence_transformers import SentenceTransformer
     import chromadb 
-    from chromadb.configs import settings 
 
     doc = pymupdf.open(pdf)
     pages = [page.get_text() for page in doc]
+    Title = ''.join(pages[0].split('\n')[:10])
 
-    client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet",persist_directory=vector_dir))
-    collection = client.get_or_create_collection(name="MAMTOX_Collections")
+    client = chromadb.PersistentClient(path=vector_dir)
 
-    model = Sentence_Transformer('all-MiniLM-L6-v2') 
-    embeddings = model.encode(texts).to_list()
+    model = SentenceTransformer('all-MiniLM-L6-v2') 
+    embeddings = model.encode(pages).tolist()
 
+    collection = client.create_collection(name='toxicology_all',embedding_function=embeddings)
     collection.add(
-        documents = texts,
-        embeddings = embeddings
+        documents=pages,
+        metadatas=[{
+            'title':Title
+        }]
     )
-
-    client.persist()
 
 def breakdown_input(question,llm):
     from langchain import PromptTemplate
