@@ -64,6 +64,8 @@ def search_and_parse(pdf,keywords,vector_dir):
         ids = ids
     )
 
+    return collection_name
+
 def just_parse(pdf,vector_dir):
     import pymupdf 
     from sentence_transformers import SentenceTransformer
@@ -85,6 +87,8 @@ def just_parse(pdf,vector_dir):
             'title':Title
         }]
     )
+
+    return collection_name
 
 def breakdown_input(question,llm):
     from langchain import PromptTemplate
