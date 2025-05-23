@@ -21,74 +21,106 @@ def store_pdf_id(pdf,dict):
     dict.update({id:pdf})
 
 
-def search_and_parse(pdf,keywords,vector_dir):
+def search_and_parse(pdf: str, keywords: list[str], vector_dir: str):
     import pymupdf
-    import chromadb 
-    import numpy as np
+    import chromadb
+    from langchain_chroma import Chroma
+    import uuid
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_core.documents import Document
 
     doc = pymupdf.open(pdf)
     pages = [page.get_text() for page in doc] # room for opitmization, see if can use dicts, too lazy now
     relevant_pages = []
 
     # Find pages of the report relevant to the question, if the question is specific (e.g. about sensitization, genotox..etc.)
-    for keyword in keywords:
-        for p in pages:
-            index = pages.index(p)
-            text_lower = p.lower()
-            keyword_lower = keyword.lower()
-            words_page = text_lower.split(' ')
-            title = " ".join(words_page[:100])
+    try:
+      for idx, p in enumerate(pages):
+          index = idx
+          text_lower = p.lower()
+          words_page = text_lower.split(' ')
+          title = " ".join(words_page[:100])
 
-            if words_page.count(keyword_lower) > 0:
-                relevant_pages.append([title,index,p])
-            
-    # Initializing vector client
-    client = chromadb.PersistentClient(path=vector_dir)
+          if any(keyword.lower() in text_lower for keyword in keywords):
+              relevant_pages.append([title, index, p])
 
-    metadata = [{
-        "original_doc_dir":pdf,
-        "titles": title,
-        "pages": index
-        } for title,index,text in relevant_pages]
-    
-    ids = [f'page{i}' for i in range(len(relevant_pages))]
+      documents = [Document(
+          page_content = text,
+          metadata = {"original_doc_dir":pdf,
+          "titles": title,
+          "page": index},
+          id = index
+      ) for title,index,text in relevant_pages]
 
-    texts = [page[2] for page in pages]
-    collection_name = np.random.rand(1,1).tolist()[0][0]
-    
-    collection = client.create_collection(name=str(collection_name)) # Chroma uses SentenceTransformers as default, built-in embedding. Naming is random to avoid hitting existing names
+      uuids = [str(uuid.uuid4()) for _ in range(len(documents))]
 
-    collection.add(
-        documents = texts,
-        metadatas = metadata,
-        ids = ids
-    )
+      collection_name = str(uuid.uuid4())  # Unique collection name
 
-    return collection_name
+      # Initialize Vector Store
+      embedding_func = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+      vector_store = Chroma(
+          collection_name=collection_name,
+          embedding_function=embedding_func,
+          persist_directory=vector_dir
+      )
+
+      # Add pages to VDB
+      if relevant_pages:  # Only add if there are relevant pages
+          vector_store.add_documents(documents=documents,ids=uuids)
+
+      # For one pdf only
+      globals()['vector_store'] = vector_store # Updates the vector store.
+
+      # For multiple PDFs, simply create global dictionary and update.
+    except FileNotFoundError:
+        raise ValueError(f"PDF file not found: {pdf}")
+    except Exception as e:
+        raise Exception(f"Error processing PDF: {str(e)}")
 
 def just_parse(pdf,vector_dir):
-    import pymupdf 
-    from sentence_transformers import SentenceTransformer
-    import chromadb 
+    import pymupdf
+    import chromadb
+    from langchain_chroma import Chroma
+    import uuid
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_core.documents import Document
+    try:
+      doc = pymupdf.open(pdf)
+      pages = [page.get_text() for page in doc]
+      Title = ''.join(pages[0].split('\n')[:10])
+      text = "\n\n".join(pages)
+      uuid_doc = str(uuid.uuid4())
+      documents = [Document(
+          page_content = text,
+          metadata = {'title':Title,
+          'length':len(pages)},
+          id = uuid_doc
+      )]
 
-    doc = pymupdf.open(pdf)
-    pages = [page.get_text() for page in doc]
-    Title = ''.join(pages[0].split('\n')[:10])
+      collection_name = str(uuid.uuid4())  # Unique collection name
 
-    client = chromadb.PersistentClient(path=vector_dir)
+      # Initialize Vector Store
+      embedding_func = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+      vector_store = Chroma(
+          collection_name=collection_name,
+          embedding_function=embedding_func,
+          persist_directory=vector_dir
+      )
 
-    model = SentenceTransformer('all-MiniLM-L6-v2') 
-    embeddings = model.encode(pages).tolist()
+      # Add pages to VDB
+      if pages:  # Only add if there are relevant pages
+          vector_store.add_documents(
+              documents = documents,
+              ids = uuid)
 
-    collection = client.create_collection(name='toxicology_all',embedding_function=embeddings)
-    collection.add(
-        documents=pages,
-        metadatas=[{
-            'title':Title
-        }]
-    )
+      # For one pdf only
+      globals()['vector_store'] = vector_store # Updates the vector store.
 
-    return collection_name
+      # For multiple PDFs, simply create global dictionary and update.
+    except FileNotFoundError:
+        raise ValueError(f"PDF file not found: {pdf}")
+    except Exception as e:
+        raise Exception(f"Error processing PDF: {str(e)}")
 
 def breakdown_input(question,llm):
     from langchain import PromptTemplate
@@ -106,12 +138,3 @@ def breakdown_input(question,llm):
     response = llm(prompt.format(query=question)
 
     return response.strip(\n) # not sure if correct syntax, should check later.
-
-def RAG(question,vector_dir):
-    question = question
-    vector_dir = vector_dir
-    
-
-    class RAG_State(TypedDict):
-        question: str
-        context: 
