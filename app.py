@@ -7,6 +7,7 @@ from typing_extensions import TypedDict, List, Literal
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from langchain_core.documents import Document
+from utils import search_and_parse, just_parse, calculator_add, calculator_multiply
 
 # Initialization --------------------------------------------------------------------------------------------
 pdf_fp = r'' # put pdf here
@@ -36,11 +37,11 @@ class GraphState(TypedDict):
     #vector_stores: dict # for multiple pdfs. { pdf_fp: vector_store }
 
 # Define Nodes ----------------------------------------------------------------
-llm_with_tools = llm.bind_tools([]) # put tools here
+llm_with_tools = llm.bind_tools([calculator_add,calculator_multiply]) # put tools here
 def tools_call_1(state:GraphState):
     return {"messages":[llm_with_tools.invoke(state["question"])]}
 
-tool_node_1 = ToolNode(tools=[]) # tools here
+tool_node_1 = ToolNode(tools=[calculator_add,calculator_multiply]) # tools here
 
 def retrieve(state: GraphState):
     if state['vector_store'] is None:
