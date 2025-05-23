@@ -8,11 +8,10 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from langchain_core.documents import Document
 from utils import search_and_parse, just_parse, calculator_add, calculator_multiply
+import time
 
 # Initialization --------------------------------------------------------------------------------------------
 pdf_fp = r'' # put pdf here
-question = "" # put question here
-keywords = [] # put list of keywords (str) here
 vectordb_dir = r'vectordb/'
 cache_dir = r'cache/'
 
@@ -23,13 +22,15 @@ llm = Llamacpp(
     n_threads = 8,
     n_batch = 128,
     temperature = 0,
-    verbose = False
+    verbose = False,
+    n_gpu_layers = 40 # layers to route to gpu
 )
 
 # Initialize State Schemas ---------------------------------------------------
 class GraphState(TypedDict):
     question:str
-    context:List[Documents]
+    keywords:List[str]
+    context:List[Document]
     tool_result:str
     output:str 
     messages: Annotated[list[AnyMessage], add_messages]
@@ -62,15 +63,14 @@ def augment(state:GraphState):
     texts = '\n\n'.join(doc.page_content for doc in GraphState['context'])
     question = state['question']
     input_text = f"You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. Question: {question} \n Context: {texts}"
-    augmented_input = HumanMessage(content=input_text,name='Human')
 
-    return{'question':augmented_input}
+    return{'question':input_text}
 
 def generate(state:GraphState):
     output = llm.invoke(state['question'])
     conversation_history = [
         HumanMessage(state['question'],name='Human'),
-        AIMessage(state['output'],name='D.A.T.A')
+        AIMessage(output,name='D.A.T.A')
     ]
     return{
         'output':output,
@@ -87,22 +87,24 @@ tool_parse = ToolNode(tools=[search_and_parse,just_parse])
 '''
 # Manual choosing of Parsing function -------------------------
 def parse_snp(state:GraphState):
-    search_and_parse(pdf_dir,keywords,vector_dir)
+    search_and_parse(pdf_fp,state['keywords'],vectordb_dir)
     return {'vector_store':vector_store}
     #return {'vector_stores': {pdf_fp:vector_store}} # for multiple pdfs
 
 def parse_all(state:GraphState):
-    just_parse(pdf_dir,vector_dir)
+    just_parse(pdf_fp,vectordb_dir)
     return{'vector_store':vector_store}
     #return {'vector_stores': {pdf_fp:vector_store}} # for multiple pdfs
 
 
-def snp_condition(state:GraphState) -> Literal('search_and_parse','just_parse'):
-    if keywords[0] is not None:
-        return 'search_and_parse'
-    elif keywords[0] is None:
-        return 'just_parse'
+def snp_condition(state:GraphState) -> Literal['parse_snp','parse_all']:
+    if state['keywords'] and any(k is not None for k in state['keywords']):
+        return 'parse_snp'
+    return 'parse_all'
 
+# Set up counter ----------------------------------------------------------------------------------------
+time_per_trial = []
+time_per_run = [] # for multiple runs (multiple pdfs)
 #-----------------------------------------------------Build Graph ---------------------------------------
 builder = StateGraph(GraphState)
 # Nodes
@@ -126,8 +128,25 @@ builder.add_edge('augment_1', 'tool_call_1')
 builder.add_conditional_edges('tool_call_1', tools_condition)
 builder.add_edge('tool_use_1', 'generate_1')
 builder.add_edge('generate_1', END)
+graph = builder.compile()
 
-graph = builder.comile()
+#-----------------------------------------------Run Graph ------------------------------------------------
+inputs = [
+    ['question 1',[]],
+    ['question 2',[]]
+] # question:str, keywords:list()
 
-print(GraphState['messages'])
+for idx,q in enumerate(inputs):
+    question = q[0]
+    keywords = q[1] 
+    start_time = time.time()
+    response = graph.invoke({'question':question,'keywords':keywords})
+    with open(os.path.join(cache_dir,'run_1.txt'),'a') as cache:
+        cache.write(response['messages'] + '\n')
+    
+    end_time = time.time()
+    duration = end_time-start_time
+    time_per_trial.append(duration)
+    print('Trial {idx} complete, time took: {duration:.2f} seconds.')
+# GraphState is a type, not instance.
 
